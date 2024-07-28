@@ -15,7 +15,14 @@ router.get("/", (req, res) => {
   })
 })
 
-app.use(router)
+router.get("/api", (req, res) => {
+  return res.json({
+    "msg" : "Welcome to smart touma API"
+  })
+})
+
+app.use(express.json())
+app.use(router);
 app.use('/api/auth', AuthRouter);
 
 app.listen(PORT, _ => {
