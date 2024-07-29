@@ -1,7 +1,17 @@
 FROM node:22-alpine3.19
 
 WORKDIR /app
-RUN apt-get update && apt-get install texlive && apt-get clean
+RUN apk update && \
+    apk add --no-cache \
+    texlive \
+    texmf-dist-texlive \
+    texlive-xetex \
+    texlive-luatex \
+    texlive-fonts-recommended \
+    texlive-fonts-extra \
+    texlive-latex-extra \
+    ghostscript
+    
 COPY package*.json ./
 
 RUN npm install
