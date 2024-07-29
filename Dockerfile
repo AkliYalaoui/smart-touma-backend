@@ -1,17 +1,11 @@
 FROM node:22-alpine3.19
 
 WORKDIR /app
-RUN apk update && \
-    apk add --no-cache \
-    texlive \
-    texmf-dist-texlive \
-    texlive-xetex \
-    texlive-luatex \
-    texlive-fonts-recommended \
-    texlive-fonts-extra \
-    texlive-latex-extra \
-    ghostscript
-    
+RUN apk update
+RUN apk add --upgrade texlive-full
+RUN apk add --upgrade make
+RUN apk add --upgrade zip
+
 COPY package*.json ./
 
 RUN npm install
