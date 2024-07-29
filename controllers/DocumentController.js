@@ -14,22 +14,36 @@ const getDocuments = async (req, res) => {
   try {
     const uid = req.uid;
     if (!uid) throw new Error("UID is required");
+    const { pageSize = 10, pageToken } = req.query;
     const db = admin.firestore();
-    const documentsRef = db.collection("documents");
-    const snapshot = await documentsRef.where("user_id", "==", uid).get();
+    const documentsRef = db.collection("documents").where("user_id", "==", uid);
 
-    const document_data = [];
-    if (snapshot.empty) {
-      console.log("No matching documents.");
+    let query = documentsRef.limit(parseInt(pageSize));
+
+    if (pageToken) {
+      const snapshot = await documentsRef.doc(pageToken).get();
+      if (!snapshot.exists) {
+        throw new Error("Invalid page token");
+      }
+      query = query.startAfter(snapshot);
     }
-    snapshot.forEach((doc) => document_data.push(doc.data()));
-    res.status(StatusCodes.OK).json(document_data);
+
+    const snapshot = await query.get();
+    const documents = [];
+    let lastVisible = null;
+    snapshot.forEach((doc) => {
+      documents.push({ id: doc.id, ...doc.data() });
+      lastVisible = doc;
+    });
+
+    const nextPageToken = lastVisible ? lastVisible.id : null;
+    res.status(StatusCodes.OK).json({ documents, nextPageToken });
   } catch (error) {
     res.status(StatusCodes.UNAUTHORIZED).json({ error: error.message });
   }
 };
 
-const processImages = async (req, res) => {
+const addDocument = async (req, res) => {
   try {
     // Process uploaded files
     if (!req.files) throw new Error("Must upload at least one image");
@@ -69,7 +83,7 @@ const processImages = async (req, res) => {
       can_access: [],
     };
 
-    const docRef = await db.collection("documents").add(data);
+    await db.collection("documents").add(data);
     // Generate PDF from LaTeX code
     const pdfStream = latex(latexCode);
     const tmpFile = tmp.fileSync({ postfix: ".pdf" });
@@ -82,7 +96,7 @@ const processImages = async (req, res) => {
             console.error("Error sending file:", err);
             res
               .status(StatusCodes.INTERNAL_SERVER_ERROR)
-              .json({error : "Error sending file"});
+              .json({ error: "Error sending file" });
           }
 
           // Clean up temporary file
@@ -97,12 +111,95 @@ const processImages = async (req, res) => {
         console.error("Error generating PDF:", err);
         res
           .status(StatusCodes.INTERNAL_SERVER_ERROR)
-          .json({error:"Error generating PDF"});
+          .json({ error: "Error generating PDF" });
       });
-
   } catch (error) {
     res.status(StatusCodes.BAD_REQUEST).send({ error: error.message });
   }
 };
 
-module.exports = { getDocuments, processImages };
+const updateDocument = async (req, res) => {
+  try {
+    const uid = req.uid;
+    const { docId } = req.params;
+    const db = admin.firestore();
+    const { user_prompt } = req.body;
+
+    if (!docId) throw new Error("Document ID is required");
+
+    const docRef = db.collection("documents").doc(docId);
+    const docSnapshot = await docRef.get();
+
+    if (!docSnapshot.exists) {
+      return res
+        .status(StatusCodes.NOT_FOUND)
+        .json({ error: "Document not found" });
+    }
+
+    const { name, latex_code, title, user_id, can_ccess } = docSnapshot.data();
+    if (user_id != uid && !can_ccess.includes(uid)) {
+      return res
+        .status(StatusCodes.UNAUTHORIZED)
+        .json({ error: "Document Is PRIVATE" });
+    }
+
+    const result = await model.generateContent([
+      update_pdf_prompt(name, user_prompt, title, latex_code),
+    ]);
+    const response = await result.response;
+    const llmResponse = response.text();
+    const parsed_res = parseLatexResponse(llmResponse);
+
+    await docRef.update({
+      title: parsed_res.title,
+      latex_code: parsed_res.latexCode,
+    });
+
+    res
+      .status(StatusCodes.OK)
+      .json({ message: "Document updated successfully" });
+  } catch (error) {
+    res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
+  }
+};
+
+const deleteDocument = async (req, res) => {
+  try {
+    const uid = req.uid;
+    const { docId } = req.params;
+    const db = admin.firestore();
+
+    if (!docId) throw new Error("Document ID is required");
+
+    const docRef = db.collection("documents").doc(docId);
+    const docSnapshot = await docRef.get();
+
+    if (!docSnapshot.exists) {
+      return res
+        .status(StatusCodes.NOT_FOUND)
+        .json({ error: "Document not found" });
+    }
+
+    const { user_id, can_ccess } = docSnapshot.data();
+    if (user_id != uid && !can_ccess.includes(uid)) {
+      return res
+        .status(StatusCodes.UNAUTHORIZED)
+        .json({ error: "Document Is PRIVATE" });
+    }
+
+    await docRef.delete();
+
+    res
+      .status(StatusCodes.OK)
+      .json({ message: "Document deleted successfully" });
+  } catch (error) {
+    res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
+  }
+};
+
+module.exports = {
+  getDocuments,
+  addDocument,
+  updateDocument,
+  deleteDocument,
+};

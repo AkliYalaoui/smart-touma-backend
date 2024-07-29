@@ -35,6 +35,24 @@ Title: Your Document Title
 ...
 `;
 
+const update_pdf_prompt = (template_name, user_prompt, title, latex_code) => `
+You are a LaTeX expert. Your task is to update the provided LaTeX document according to the given user instructions. Please ensure to maintain the same structure and accurately incorporate any changes as per the instructions.
+
+Template Name: ${template_name}:
+Title of the document : ${title}
+${latex_code}
+Existing LaTeX Code:
+${latex_code}
+
+User Instructions:
+${user_prompt}
+
+Please provide the updated LaTeX code and the title of the document.
+Response format:
+Title: [Updated Document Title]
+[Updated LaTeX Code]
+`;
+
 const parseLatexResponse = (response) => {
   // Extract title
   const titleMatch = response.match(/Title: (.+)\n/);
@@ -46,4 +64,4 @@ const parseLatexResponse = (response) => {
   return { title, latexCode };
 };
 
-module.exports = {model, fileToGenerativePart, pdf_prompt, parseLatexResponse}
+module.exports = {model, fileToGenerativePart, pdf_prompt, parseLatexResponse, update_pdf_prompt}

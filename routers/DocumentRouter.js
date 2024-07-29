@@ -1,9 +1,11 @@
 const router = require("express").Router();
 const verifyTokenAndApiKey = require('../middlewares/AuthMiddleware.js');
 const upload = require('../middlewares/ImageMiddleware.js');
-const {getDocuments, processImages} = require("../controllers/DocumentController.js");
+const DocumentController = require("../controllers/DocumentController.js");
 
-router.get("/", verifyTokenAndApiKey, getDocuments);
-router.post("/process", verifyTokenAndApiKey, upload, processImages);
+router.get("/", verifyTokenAndApiKey, DocumentController.getDocuments);
+router.post("/", verifyTokenAndApiKey, upload, DocumentController.addDocument);
+router.put('/:docId', verifyTokenAndApiKey, DocumentController.updateDocument);
+router.delete('/:docId',verifyTokenAndApiKey, DocumentController.deleteDocument);
 
 module.exports = router;
