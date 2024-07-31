@@ -14,7 +14,7 @@ const verifyTokenAndApiKey = async (req, res, next) => {
     }
   
     if (!apiKey || apiKey !== process.env.API_KEY) {
-      return res.status(StatusCodes.FORBIDDEN).send('Invalid API Key');
+      return res.status(StatusCodes.FORBIDDEN).json({error:'Invalid API Key'});
     }
   
     try {

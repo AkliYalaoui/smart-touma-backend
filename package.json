@@ -28,6 +28,7 @@
     "firebase-admin": "^12.3.0",
     "http-status-codes": "^2.3.0",
     "multer": "^1.4.5-lts.1",
+    "rimraf": "^6.0.1",
     "tmp": "^0.2.3"
   },
   "devDependencies": {
