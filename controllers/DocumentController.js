@@ -14,17 +14,17 @@ const getDocuments = async (req, res) => {
   try {
     const uid = req.uid;
     if (!uid) throw new Error("UID is required");
+
     const { pageSize = 10, pageToken } = req.query;
     const db = admin.firestore();
     const documentsRef = db.collection("documents").where("user_id", "==", uid);
 
-    let query = documentsRef.limit(parseInt(pageSize));
+    let query = documentsRef.limit(parseInt(pageSize, 10));
 
     if (pageToken) {
       const snapshot = await documentsRef.doc(pageToken).get();
-      if (!snapshot.exists) {
-        throw new Error("Invalid page token");
-      }
+      if (!snapshot.exists) throw new Error("Invalid page token");
+
       query = query.startAfter(snapshot);
     }
 
@@ -39,13 +39,50 @@ const getDocuments = async (req, res) => {
     const nextPageToken = lastVisible ? lastVisible.id : null;
     res.status(StatusCodes.OK).json({ documents, nextPageToken });
   } catch (error) {
-    res.status(StatusCodes.UNAUTHORIZED).json({ error: error.message });
+    res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
+  }
+};
+
+const getDocumentById = async (req, res) => {
+  try {
+    const uid = req.uid;
+    const { docId } = req.params;
+    const db = admin.firestore();
+
+    if (!docId) throw new Error("Document ID is required");
+
+    const docRef = db.collection("documents").doc(docId);
+    const docSnapshot = await docRef.get();
+
+    if (!docSnapshot.exists) {
+      return res
+        .status(StatusCodes.NOT_FOUND)
+        .json({ error: "Document not found" });
+    }
+
+    const { latex_code, user_id, can_access } = docSnapshot.data();
+    if (user_id !== uid && !can_access.includes(uid)) {
+      return res.status(StatusCodes.FORBIDDEN).json({ error: "Access denied" });
+    }
+
+    const { pdfFilePath, cleanupCallback } = await generatePDF(latex_code);
+
+    res.status(StatusCodes.OK).sendFile(pdfFilePath, (err) => {
+      if (err) {
+        console.error("Error sending file:", err);
+        res
+          .status(StatusCodes.INTERNAL_SERVER_ERROR)
+          .json({ error: "Error sending file" });
+      }
+      cleanupCallback();
+    });
+  } catch (error) {
+    res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
   }
 };
 
 const addDocument = async (req, res) => {
   try {
-    // Process uploaded files
     if (!req.files) throw new Error("Must upload at least one image");
 
     const imageParts = [];
@@ -61,16 +98,18 @@ const addDocument = async (req, res) => {
     const db = admin.firestore();
     const pdfTemplate_id = req.body.template_id || "xsgiPJZWr9iN8BViMQb7";
     const snapshot = await db.collection("templates").doc(pdfTemplate_id).get();
-    if (snapshot.empty) {
+    if (!snapshot.exists) {
       throw new Error("No matching template");
     }
+
     const template_name = snapshot.data().name;
     const result = await model.generateContent([
       pdf_prompt(template_name),
       ...imageParts,
     ]);
+
     const response = await result.response;
-    const llmResponse = response.text();
+    const llmResponse = await response.text();
 
     const { title, latexCode } = parseLatexResponse(llmResponse);
 
@@ -79,7 +118,7 @@ const addDocument = async (req, res) => {
       latex_code: latexCode,
       template: db.doc("templates/" + pdfTemplate_id),
       user_id: req.uid,
-      category: db.doc("categories/SqdgDc0KvcLNbf7eD90i"),
+      category: null,
       can_access: [],
     };
 
@@ -91,10 +130,10 @@ const addDocument = async (req, res) => {
     res.status(StatusCodes.CREATED).sendFile(pdfFilePath, (err) => {
       if (err) {
         console.error("Error sending file:", err);
-        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: "Error sending file" });
+        res
+          .status(StatusCodes.INTERNAL_SERVER_ERROR)
+          .json({ error: "Error sending file" });
       }
-
-      // Clean up temporary directory
       cleanupCallback();
     });
   } catch (error) {
@@ -120,18 +159,16 @@ const updateDocument = async (req, res) => {
         .json({ error: "Document not found" });
     }
 
-    const { name, latex_code, title, user_id, can_ccess } = docSnapshot.data();
-    if (user_id != uid && !can_ccess.includes(uid)) {
-      return res
-        .status(StatusCodes.UNAUTHORIZED)
-        .json({ error: "Document Is PRIVATE" });
+    const { name, latex_code, title, user_id, can_access } = docSnapshot.data();
+    if (user_id !== uid && !can_access.includes(uid)) {
+      return res.status(StatusCodes.FORBIDDEN).json({ error: "Access denied" });
     }
 
     const result = await model.generateContent([
       update_pdf_prompt(name, user_prompt, title, latex_code),
     ]);
     const response = await result.response;
-    const llmResponse = response.text();
+    const llmResponse = await response.text();
     const parsed_res = parseLatexResponse(llmResponse);
 
     await docRef.update({
@@ -139,9 +176,18 @@ const updateDocument = async (req, res) => {
       latex_code: parsed_res.latexCode,
     });
 
-    res
-      .status(StatusCodes.OK)
-      .json({ message: "Document updated successfully" });
+    const { pdfFilePath, cleanupCallback } = await generatePDF(
+      parsed_res.latexCode
+    );
+    res.status(StatusCodes.OK).sendFile(pdfFilePath, (err) => {
+      if (err) {
+        console.error("Error sending file:", err);
+        res
+          .status(StatusCodes.INTERNAL_SERVER_ERROR)
+          .json({ error: "Error sending file" });
+      }
+      cleanupCallback();
+    });
   } catch (error) {
     res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
   }
@@ -164,15 +210,12 @@ const deleteDocument = async (req, res) => {
         .json({ error: "Document not found" });
     }
 
-    const { user_id, can_ccess } = docSnapshot.data();
-    if (user_id != uid && !can_ccess.includes(uid)) {
-      return res
-        .status(StatusCodes.UNAUTHORIZED)
-        .json({ error: "Document Is PRIVATE" });
+    const { user_id, can_access } = docSnapshot.data();
+    if (user_id !== uid && !can_access.includes(uid)) {
+      return res.status(StatusCodes.FORBIDDEN).json({ error: "Access denied" });
     }
 
     await docRef.delete();
-
     res
       .status(StatusCodes.OK)
       .json({ message: "Document deleted successfully" });
@@ -183,6 +226,7 @@ const deleteDocument = async (req, res) => {
 
 module.exports = {
   getDocuments,
+  getDocumentById,
   addDocument,
   updateDocument,
   deleteDocument,
