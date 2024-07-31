@@ -9,8 +9,6 @@ const {
   parseLatexResponse,
 } = require("../gemini.js");
 const { StatusCodes } = require("http-status-codes");
-const latex = require("latex");
-const tmp = require("tmp");
 
 const getDocuments = async (req, res) => {
   try {
