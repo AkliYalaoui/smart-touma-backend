@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const DocumentRouter = require("./routers/DocumentRouter.js");
+const CategoryRouter = require("./routers/CategoryRouter.js");
 const {config} = require('dotenv');
 config();
 
@@ -31,6 +32,7 @@ router.get("/api", (_, res) => {
 app.use(express.json())
 app.use(router);
 app.use('/api/documents', DocumentRouter);
+app.use('/api/categories', CategoryRouter);
 
 app.listen(PORT, _ => {
   console.log('smart touma API listening on port 8080!')
