@@ -27,7 +27,6 @@
     "firebase": "^10.12.4",
     "firebase-admin": "^12.3.0",
     "http-status-codes": "^2.3.0",
-    "latex": "^0.0.1",
     "multer": "^1.4.5-lts.1",
     "tmp": "^0.2.3"
   },

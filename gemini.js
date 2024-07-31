@@ -40,7 +40,6 @@ You are a LaTeX expert. Your task is to update the provided LaTeX document accor
 
 Template Name: ${template_name}:
 Title of the document : ${title}
-${latex_code}
 Existing LaTeX Code:
 ${latex_code}
 

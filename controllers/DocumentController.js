@@ -1,5 +1,7 @@
 const admin = require("firebase-admin");
 const fs = require("fs");
+const pdf = require("../utils/pdf.js");
+
 const {
   model,
   fileToGenerativePart,
@@ -84,37 +86,21 @@ const addDocument = async (req, res) => {
     };
 
     await db.collection("documents").add(data);
+
     // Generate PDF from LaTeX code
-    const pdfStream = latex(latexCode);
-    const tmpFile = tmp.fileSync({ postfix: ".pdf" });
+    const { pdfFilePath, cleanupCallback } = await pdf.generate(latexCode);
 
-    pdfStream
-      .pipe(fs.createWriteStream(tmpFile.name))
-      .on("finish", () => {
-        res.status(StatusCodes.CREATED).sendFile(tmpFile.name, (err) => {
-          if (err) {
-            console.error("Error sending file:", err);
-            res
-              .status(StatusCodes.INTERNAL_SERVER_ERROR)
-              .json({ error: "Error sending file" });
-          }
+    res.status(StatusCodes.CREATED).sendFile(pdfFilePath, (err) => {
+      if (err) {
+        console.error("Error sending file:", err);
+        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: "Error sending file" });
+      }
 
-          // Clean up temporary file
-          fs.unlink(tmpFile.name, (err) => {
-            if (err) {
-              console.error("Error deleting file:", err);
-            }
-          });
-        });
-      })
-      .on("error", (err) => {
-        console.error("Error generating PDF:", err);
-        res
-          .status(StatusCodes.INTERNAL_SERVER_ERROR)
-          .json({ error: "Error generating PDF" });
-      });
+      // Clean up temporary directory
+      cleanupCallback();
+    });
   } catch (error) {
-    res.status(StatusCodes.BAD_REQUEST).send({ error: error.message });
+    res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
   }
 };
 
