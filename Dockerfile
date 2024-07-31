@@ -1,26 +1,23 @@
-FROM node:22-alpine3.19
+# Use an image with LaTeX installed
+FROM texlive/texlive:latest
 
+# Install Node.js
+RUN apt-get update && apt-get install -y curl gnupg && \
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y nodejs
+
+# Set working directory
 WORKDIR /app
 
-RUN apk update && \
-    apk upgrade && \
-    apk add --no-cache perl wget && \
-    wget http://mirror.ctan.org/systems/texlive/tlnet/install-tl-unx.tar.gz && \
-    tar -xzf install-tl-unx.tar.gz && \
-    cd install-tl-* && \
-    echo "selected_scheme scheme-small" > texlive.profile && \
-    echo "tlpdbopt_install_docfiles 0" >> texlive.profile && \
-    echo "tlpdbopt_install_srcfiles 0" >> texlive.profile && \
-    ./install-tl --profile=texlive.profile && \
-    cd .. && \
-    rm -rf install-tl-* install-tl-unx.tar.gz
-
+# Install application dependencies
 COPY package*.json ./
-
 RUN npm install
 
+# Copy application files
 COPY . .
 
+# Expose the port
 EXPOSE 8080
 
+# Command to run the application
 CMD ["node", "server.js"]
