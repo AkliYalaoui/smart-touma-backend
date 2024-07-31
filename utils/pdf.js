@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { exec } = require("child_process");
 const tmp = require("tmp");
-const {rimraf} = require("rimraf");
+const { rimraf } = require("rimraf");
 
 const generate = (latexCode) => {
   return new Promise((resolve, reject) => {
@@ -16,13 +16,20 @@ const generate = (latexCode) => {
       if (error) {
         console.error("Error generating PDF:", error);
         console.error(stderr);
-        rimraf(tmpDir.name, () => reject(new Error("Error generating PDF")));
+        // Remove the temp directory
+        rimraf(tmpDir.name)
+          .then(() => reject(new Error("Error generating PDF")))
+          .catch((err) => reject(new Error("Error cleaning up temp files")));
       } else {
-        resolve({ pdfFilePath, cleanupCallback: () => rimraf(tmpDir.name, () => {}) });
+        resolve({
+          pdfFilePath,
+          cleanupCallback: () => {
+            rimraf(tmpDir.name).catch((err) => console.error("Error cleaning up temp files:", err));
+          },
+        });
       }
     });
   });
 };
 
-
-module.exports = {generate}
+module.exports = {generate};
