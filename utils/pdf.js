@@ -4,7 +4,7 @@ const { exec } = require("child_process");
 const tmp = require("tmp");
 const rimraf = require("rimraf");
 
-const generatePDF = (latexCode) => {
+const generate = (latexCode) => {
   return new Promise((resolve, reject) => {
     const tmpDir = tmp.dirSync({ unsafeCleanup: true });
     const texFilePath = path.join(tmpDir.name, "document.tex");
@@ -23,3 +23,6 @@ const generatePDF = (latexCode) => {
     });
   });
 };
+
+
+module.exports = {generate}
