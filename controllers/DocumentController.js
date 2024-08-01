@@ -23,7 +23,7 @@ const getDocuments = async (req, res) => {
     let query = documentsRef.limit(parseInt(pageSize, 10));
 
     if (pageToken) {
-      const snapshot = await documentsRef.doc(pageToken).get();
+      const snapshot = await db.collection("documents").doc(pageToken).get();
       if (!snapshot.exists) throw new Error("Invalid page token");
 
       query = query.startAfter(snapshot);
