@@ -6,6 +6,7 @@ const {
   model,
   fileToGenerativePart,
   pdf_prompt,
+  update_pdf_prompt,
   parseLatexResponse,
 } = require("../gemini.js");
 const { StatusCodes } = require("http-status-codes");
@@ -65,7 +66,7 @@ const getDocumentById = async (req, res) => {
       return res.status(StatusCodes.FORBIDDEN).json({ error: "Access denied" });
     }
 
-    const { pdfFilePath, cleanupCallback } = await generatePDF(latex_code);
+    const { pdfFilePath, cleanupCallback } = await pdf.generate(latex_code);
 
     res.status(StatusCodes.OK).sendFile(pdfFilePath, (err) => {
       if (err) {
@@ -176,7 +177,9 @@ const updateDocument = async (req, res) => {
       latex_code: parsed_res.latexCode,
     });
 
-    const { pdfFilePath, cleanupCallback } = await generatePDF(
+    console.log(parsed_res);
+
+    const { pdfFilePath, cleanupCallback } = await pdf.generate(
       parsed_res.latexCode
     );
     res.status(StatusCodes.OK).sendFile(pdfFilePath, (err) => {
