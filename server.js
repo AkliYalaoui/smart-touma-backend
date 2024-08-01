@@ -6,6 +6,7 @@ const CategoryRouter = require("./routers/CategoryRouter.js");
 const TemplateRouter = require("./routers/TemplateRouter.js");
 const PDFDocRouter = require("./routers/PDFDocRouter.js");
 const SearchRouter = require("./routers/SearchRouter.js");
+const HomeRouter = require("./routers/HomeRouter.js");
 
 const {config} = require('dotenv');
 config();
@@ -40,6 +41,7 @@ app.use('/api/categories', CategoryRouter);
 app.use('/api/templates', TemplateRouter);
 app.use('/api/pdfdoc', PDFDocRouter);
 app.use('/api/search', SearchRouter);
+app.use('/api/screen-page', HomeRouter);
 
 app.listen(PORT, _ => {
   console.log('smart touma API listening on port 8080!')
