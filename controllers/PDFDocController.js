@@ -1,5 +1,5 @@
 const admin = require("firebase-admin");
-const { getRAGAnswer } = require("../gemini.js");
+const { getRAGAnswer } = require("../rag.js");
 const { StatusCodes } = require("http-status-codes");
 
 const shareDocument = async (req, res) => {
