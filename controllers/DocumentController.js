@@ -44,6 +44,40 @@ const getDocuments = async (req, res) => {
   }
 };
 
+const getSharedDocuments = async (req, res) => {
+  try {
+    const uid = req.uid;
+    if (!uid) throw new Error("UID is required");
+
+    const { pageSize = 10, pageToken } = req.query;
+    const db = admin.firestore();
+    const documentsRef = db.collection("documents").where("can_access", "array-contains", uid);
+
+    let query = documentsRef.limit(parseInt(pageSize, 10));
+
+    if (pageToken) {
+      const snapshot = await db.collection("documents").doc(pageToken).get();
+      if (!snapshot.exists) throw new Error("Invalid page token");
+
+      query = query.startAfter(snapshot);
+    }
+
+    const snapshot = await query.get();
+    const documents = [];
+    let lastVisible = null;
+    snapshot.forEach((doc) => {
+      documents.push({ id: doc.id, ...doc.data() });
+      lastVisible = doc;
+    });
+
+    const nextPageToken = lastVisible ? lastVisible.id : null;
+    res.status(StatusCodes.OK).json({ documents, nextPageToken });
+  } catch (error) {
+    res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
+  }
+};
+
+
 const getDocumentById = async (req, res) => {
   try {
     const uid = req.uid;
@@ -229,6 +263,7 @@ const deleteDocument = async (req, res) => {
 
 module.exports = {
   getDocuments,
+  getSharedDocuments,
   getDocumentById,
   addDocument,
   updateDocument,
