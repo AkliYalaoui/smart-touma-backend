@@ -1,17 +1,25 @@
 const admin = require("firebase-admin");
 const { StatusCodes } = require("http-status-codes");
-
+const CategoryValidator = require("../utils/categoryValidator.js");
 
 const createCategory = async (req, res) => {
   try {
     const { name, description } = req.body;
     const uid = req.uid;
-
-    if (!name) throw new Error("Category name is required");
+    const normalizedName = CategoryValidator(name, description);
 
     const db = admin.firestore();
-    const categoryData = { name, description, user_id: uid };
+    const existingCategoriesSnapshot = await db
+      .collection("categories")
+      .where("user_id", "==", uid)
+      .where("name", "==", normalizedName)
+      .get();
 
+    if (!existingCategoriesSnapshot.empty) {
+      throw new Error("Category name already exists");
+    }
+
+    const categoryData = { name: normalizedName, description, user_id: uid };
     const docRef = await db.collection("categories").add(categoryData);
 
     res.status(StatusCodes.CREATED).json({
@@ -99,7 +107,23 @@ const updateCategory = async (req, res) => {
     }
 
     const updatedData = {};
-    if (name) updatedData.name = name;
+    if (name) {
+      const normalizedName = CategoryValidator(name, description);
+      const existingCategoriesSnapshot = await db
+        .collection("categories")
+        .where("user_id", "==", uid)
+        .where("name", "==", normalizedName)
+        .get();
+
+      if (
+        !existingCategoriesSnapshot.empty &&
+        existingCategoriesSnapshot.docs[0].id !== categoryId
+      ) {
+        throw new Error("Category name already exists");
+      }
+    }
+
+    updatedData.name = normalizedName;
     if (description) updatedData.description = description;
 
     await docRef.update(updatedData);
