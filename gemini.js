@@ -1,17 +1,17 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const fs = require('fs');
-const {config} = require('dotenv');
+const fs = require("fs");
+const { config } = require("dotenv");
 config();
 
 // Converts local file information to a GoogleGenerativeAI.Part object.
 function fileToGenerativePart(path, mimeType) {
-    return {
-      inlineData: {
-        data: Buffer.from(fs.readFileSync(path)).toString("base64"),
-        mimeType
-      },
-    };
-  }
+  return {
+    inlineData: {
+      data: Buffer.from(fs.readFileSync(path)).toString("base64"),
+      mimeType,
+    },
+  };
+}
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
@@ -55,12 +55,41 @@ Title: [Updated Document Title]
 const parseLatexResponse = (response) => {
   // Extract title
   const titleMatch = response.match(/Title: (.+)\n/);
-  const title = titleMatch ? titleMatch[1] : 'Untitled';
+  const title = titleMatch ? titleMatch[1] : "Untitled";
 
   // Extract LaTeX code (everything after the first blank line)
-  const latexCode = response.split('\n\n').slice(1).join('\n\n');
+  const latexCode = response.split("\n\n").slice(1).join("\n\n");
 
   return { title, latexCode };
 };
 
-module.exports = {model, fileToGenerativePart, pdf_prompt, parseLatexResponse, update_pdf_prompt}
+const qa_prompt = (latex_code, question) => {
+  const prompt = `
+  You are a highly knowledgeable assistant with the ability to understand and analyze LaTeX documents as well as to use general world knowledge to answer questions.
+
+  I will provide you with a LaTeX code snippet and a question related to the content. Your task is to answer the question based on:
+  1. The content of the LaTeX code provided, focusing on the ideas, concepts, and information it represents.
+  2. Your own knowledge if the answer is not directly apparent from the LaTeX code.
+
+  Sometimes, the answer may not be directly found in the document. Use your knowledge to provide a comprehensive and accurate response. Do not get bogged down by LaTeX syntax; focus on the content and context.
+
+  LaTeX Code:
+  ${latex_code}
+
+  Question:
+  ${question}
+
+  Answer:
+  `;
+
+  return prompt;
+};
+
+module.exports = {
+  model,
+  fileToGenerativePart,
+  pdf_prompt,
+  parseLatexResponse,
+  update_pdf_prompt,
+  qa_prompt,
+};

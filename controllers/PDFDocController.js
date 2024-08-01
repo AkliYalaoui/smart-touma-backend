@@ -1,5 +1,5 @@
 const admin = require("firebase-admin");
-const { getRAGAnswer } = require("../rag.js");
+const { model, qa_prompt } = require("../gemini.js");
 const { StatusCodes } = require("http-status-codes");
 
 const shareDocument = async (req, res) => {
@@ -133,8 +133,9 @@ const documentQA = async (req, res) => {
       return res.status(StatusCodes.FORBIDDEN).json({ error: "Access denied" });
     }
 
-    // Placeholder: Replace with actual RAG implementation
-    const answer = await getRAGAnswer(docData.latex_code, question);
+    const result = await model.generateContent([qa_prompt(docData.latex_code, question)]);
+    const response = await result.response;
+    const answer = await response.text();
 
     // Store the Q&A interaction
     await db.collection("documents").doc(docId).collection("qa").add({
