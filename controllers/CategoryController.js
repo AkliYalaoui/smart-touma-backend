@@ -1,12 +1,12 @@
 const admin = require("firebase-admin");
 const { StatusCodes } = require("http-status-codes");
-const CategoryValidator = require("../utils/categoryValidator.js");
+const {validateCategory} = require("../utils/Validator.js");
 
 const createCategory = async (req, res) => {
   try {
     const { name, description } = req.body;
     const uid = req.uid;
-    const normalizedName = CategoryValidator(name, description);
+    const normalizedName = validateCategory(name, description);
 
     const db = admin.firestore();
     const existingCategoriesSnapshot = await db
@@ -113,7 +113,7 @@ const updateCategory = async (req, res) => {
 
     const updatedData = {};
     if (name) {
-      const normalizedName = CategoryValidator(name, description);
+      const normalizedName = validateCategory(name, description);
       const existingCategoriesSnapshot = await db
         .collection("categories")
         .where("user_id", "==", uid)

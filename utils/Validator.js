@@ -8,5 +8,12 @@ const validateCategory = (name, description) => {
   return name.trim().toLowerCase(); // Return name in lowercase
 };
 
+const validateTemplate = (name, preview) => {
+  if (!name || name.trim() === '') throw new Error('Template name is required');
+  if (name.length > MAX_NAME_LENGTH) throw new Error(`Template name cannot exceed ${MAX_NAME_LENGTH} characters`);
+  if (!preview) throw new Error('Template preview is required');
+  return name.trim().toLowerCase();
+};
 
-module.exports = validateCategory
+
+module.exports = {validateCategory, validateTemplate}
