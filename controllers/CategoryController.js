@@ -121,9 +121,9 @@ const updateCategory = async (req, res) => {
       ) {
         throw new Error("Category name already exists");
       }
+      updatedData.name = normalizedName;
     }
 
-    updatedData.name = normalizedName;
     if (description) updatedData.description = description;
 
     await docRef.update(updatedData);
