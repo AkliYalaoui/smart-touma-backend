@@ -30,7 +30,9 @@ const shareDocument = async (req, res) => {
     const updatedCanAccess = Array.from(
       new Set([...docData.can_access, ...userIds])
     ); // Merge and remove duplicates
-    await docRef.update({ can_access: updatedCanAccess });
+    await docRef.update({
+      can_access: updatedCanAccess,
+    });
 
     res
       .status(StatusCodes.OK)
@@ -133,7 +135,9 @@ const documentQA = async (req, res) => {
       return res.status(StatusCodes.FORBIDDEN).json({ error: "Access denied" });
     }
 
-    const result = await model.generateContent([qa_prompt(docData.latex_code, question)]);
+    const result = await model.generateContent([
+      qa_prompt(docData.latex_code, question),
+    ]);
     const response = await result.response;
     const answer = await response.text();
 
@@ -142,7 +146,7 @@ const documentQA = async (req, res) => {
       user_id: uid,
       question,
       answer,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      created_at: admin.firestore.FieldValue.serverTimestamp(),
     });
 
     res.status(StatusCodes.OK).json({ answer });
@@ -177,7 +181,7 @@ const getDocumentQAs = async (req, res) => {
       .collection("documents")
       .doc(docId)
       .collection("qa")
-      .orderBy("timestamp", "desc")
+      .orderBy("created_at", "desc")
       .get();
 
     if (qaSnapshot.empty) {
@@ -196,5 +200,5 @@ module.exports = {
   updateDocumentCategory,
   downloadLatexCode,
   documentQA,
-  getDocumentQAs
+  getDocumentQAs,
 };

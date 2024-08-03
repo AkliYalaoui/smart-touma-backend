@@ -155,6 +155,7 @@ const addDocument = async (req, res) => {
       user_id: req.uid,
       category: null,
       can_access: [],
+      created_at: admin.firestore.FieldValue.serverTimestamp(),
     };
 
     await db.collection("documents").add(data);

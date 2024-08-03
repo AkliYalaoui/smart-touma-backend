@@ -19,7 +19,12 @@ const createCategory = async (req, res) => {
       throw new Error("Category name already exists");
     }
 
-    const categoryData = { name: normalizedName, description, user_id: uid };
+    const categoryData = {
+      name: normalizedName,
+      description,
+      user_id: uid,
+      created_at: admin.firestore.FieldValue.serverTimestamp(),
+    };
     const docRef = await db.collection("categories").add(categoryData);
 
     res.status(StatusCodes.CREATED).json({
