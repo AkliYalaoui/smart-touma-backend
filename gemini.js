@@ -36,21 +36,35 @@ Title: Your Document Title
 `;
 
 const update_pdf_prompt = (template_name, user_prompt, title, latex_code) => `
-You are a LaTeX expert. Your task is to update the provided LaTeX document according to the given user instructions. Please ensure to maintain the same structure and accurately incorporate any changes as per the instructions.
+You are a LaTeX expert. Your task is to update the provided LaTeX document according to the given user instructions. Your updated LaTeX code must be valid and compile without errors. Please ensure the following:
 
-Template Name: ${template_name}:
-Title of the document : ${title}
+1. Include any necessary LaTeX packages required for the document, especially those used in the existing LaTeX code (e.g., \`amsmath\` if you're using mathematical environments).
+2. The updated LaTeX code should be free of syntax errors and compatible with PDF generation.
+3. Verify that the document structure is correct and follows LaTeX conventions.
+
+Template Name: ${template_name}
+Title of the document: ${title}
+
 Existing LaTeX Code:
 ${latex_code}
 
 User Instructions:
 ${user_prompt}
 
-Please provide the updated LaTeX code and the title of the document.
+Please provide the updated LaTeX code, ensuring:
+1. The LaTeX code is valid and does not contain syntax errors.
+2. The document includes all necessary packages and settings for proper compilation.
+3. The LaTeX document adheres to LaTeX conventions and is suitable for PDF generation without errors.
+
 Response format:
 Title: [Updated Document Title]
-[Updated LaTeX Code]
+
+\\documentclass{${template_name}}
+ % Include necessary packages
+[Updated LaTeX Code]...
+\\end{document}
 `;
+
 
 const parseLatexResponse = (response) => {
   // Extract title
@@ -92,4 +106,5 @@ module.exports = {
   parseLatexResponse,
   update_pdf_prompt,
   qa_prompt,
+  genAI
 };

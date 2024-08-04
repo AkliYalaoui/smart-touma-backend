@@ -1,15 +1,10 @@
 const admin = require("firebase-admin");
 const { StatusCodes } = require("http-status-codes");
+const { genAI } = require("../gemini.js");
 
 const searchDocuments = async (req, res) => {
   try {
-    const {
-      categoryId,
-      templateId,
-      sharedBy,
-      sortBy = "timestamp",
-      search = "",
-    } = req.query;
+    const { categoryId, templateId, sharedBy, search = "" } = req.query;
     const { uid } = req;
     const db = admin.firestore();
 
@@ -29,28 +24,21 @@ const searchDocuments = async (req, res) => {
 
     // Perform search in title and LaTeX code
     if (search) {
-      query = query
-        .where("title", ">=", search)
-        .where("title", "<=", search + "\uf8ff");
-      query = query
-        .where("latex_code", ">=", search)
-        .where("latex_code", "<=", search + "\uf8ff");
-    }
+      const em_model = genAI.getGenerativeModel({
+        model: "text-embedding-004",
+      });
+      const result = await em_model.embedContent(search);
+      const embedding = result.embedding.values;
 
-    // Apply sorting
-    if (sortBy === "title") {
-      query = query.orderBy("title");
-    } else if (sortBy === "timestamp") {
-      query = query.orderBy("timestamp", "desc");
-    } else {
-      // Note: This would require custom logic for pertinence scoring, which isn't natively supported by Firestore
-      throw new Error(
-        "Sorting by pertinence is not supported natively in Firestore."
+      query = query.findNearest(
+        "embedding",
+        admin.firestore.FieldValue.vector(embedding),
+        {
+          limit: 2,
+          distanceMeasure: "COSINE",
+        }
       );
     }
-
-    // Limit the results
-    query = query.limit(10);
 
     const snapshot = await query.get();
 
@@ -61,10 +49,12 @@ const searchDocuments = async (req, res) => {
     const documents = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
+      embedding: []
     }));
 
     res.status(StatusCodes.OK).json(documents);
   } catch (error) {
+    console.error(error);
     res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
   }
 };

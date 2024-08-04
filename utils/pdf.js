@@ -12,7 +12,7 @@ const generate = (latexCode) => {
 
     fs.writeFileSync(texFilePath, latexCode);
 
-    exec(`pdflatex -output-directory=${tmpDir.name} ${texFilePath}`, (error, stdout, stderr) => {
+    exec(`pdflatex -interaction=nonstopmode -output-directory=${tmpDir.name} ${texFilePath}`, (error, stdout, stderr) => {
       if (error) {
         console.error("Error generating PDF:", error);
         console.error(stderr);

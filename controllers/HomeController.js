@@ -19,6 +19,7 @@ const getScreenPageData = async (req, res) => {
     const recentDocuments = recentDocsSnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
+      embedding: []
     }));
 
     // 2. Most recent shared documents
@@ -32,6 +33,7 @@ const getScreenPageData = async (req, res) => {
     const sharedDocuments = sharedDocsSnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
+      embedding: []
     }));
 
     // 3. Latest categories

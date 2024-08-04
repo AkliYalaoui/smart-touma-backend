@@ -21,4 +21,10 @@ router.delete(
   CategoryController.deleteCategory
 );
 
+router.get(
+  "/:categoryId/documents",
+  verifyTokenAndApiKey,
+  CategoryController.getDocuments
+);
+
 module.exports = router;

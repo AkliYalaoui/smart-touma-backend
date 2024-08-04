@@ -1,7 +1,7 @@
 const admin = require("firebase-admin");
-const {validateTemplate} = require("../utils/Validator.js");
+const { validateTemplate } = require("../utils/Validator.js");
 const { StatusCodes } = require("http-status-codes");
-const path = require('path');
+const path = require("path");
 
 const createTemplate = async (req, res) => {
   try {
@@ -60,22 +60,69 @@ const getTemplatePreview = (req, res) => {
   const { key, preview } = req.query;
 
   if (key !== process.env.API_KEY) {
-    return res.status(StatusCodes.UNAUTHORIZED).json({ error: 'Invalid API key' });
+    return res
+      .status(StatusCodes.UNAUTHORIZED)
+      .json({ error: "Invalid API key" });
   }
 
   if (!preview) {
-    return res.status(StatusCodes.BAD_REQUEST).json({ error: 'Preview name is required' });
+    return res
+      .status(StatusCodes.BAD_REQUEST)
+      .json({ error: "Preview name is required" });
   }
 
   // Construct the file path based on template ID
-  const filePath = path.join(__dirname, '../public', preview);
+  const filePath = path.join(__dirname, "../public", preview);
 
   res.sendFile(filePath, (err) => {
     if (err) {
-      console.error('Error sending file:', err);
-      res.status(StatusCodes.NOT_FOUND).json({ error: 'Preview not found' });
+      console.error("Error sending file:", err);
+      res.status(StatusCodes.NOT_FOUND).json({ error: "Preview not found" });
     }
   });
 };
 
-module.exports = { getTemplates, createTemplate, getTemplatePreview };
+const getDocuments = async (req, res) => {
+  try {
+    const uid = req.uid;
+    const { templateId } = req.params;
+    if (!uid) throw new Error("UID is required");
+    if (!templateId) throw new Error("Template ID is required");
+
+    const { pageSize = 10, pageToken } = req.query;
+    const db = admin.firestore();
+    const documentsRef = db
+      .collection("documents")
+      .where("user_id", "==", uid)
+      .where("template", "==", db.doc(`templates/${templateId}`));
+
+    let query = documentsRef.limit(parseInt(pageSize, 10));
+
+    if (pageToken) {
+      const snapshot = await db.collection("documents").doc(pageToken).get();
+      if (!snapshot.exists) throw new Error("Invalid page token");
+
+      query = query.startAfter(snapshot);
+    }
+
+    const snapshot = await query.get();
+    const documents = [];
+    let lastVisible = null;
+    snapshot.forEach((doc) => {
+      documents.push({ id: doc.id, ...doc.data(), embedding: [] });
+      lastVisible = doc;
+    });
+
+    const nextPageToken = lastVisible ? lastVisible.id : null;
+    res.status(StatusCodes.OK).json({ documents, nextPageToken });
+  } catch (error) {
+    res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
+  }
+};
+
+module.exports = {
+  getTemplates,
+  createTemplate,
+  getTemplatePreview,
+  getDocuments,
+};

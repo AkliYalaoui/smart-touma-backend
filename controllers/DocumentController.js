@@ -8,6 +8,7 @@ const {
   pdf_prompt,
   update_pdf_prompt,
   parseLatexResponse,
+  genAI
 } = require("../gemini.js");
 const { StatusCodes } = require("http-status-codes");
 
@@ -33,7 +34,7 @@ const getDocuments = async (req, res) => {
     const documents = [];
     let lastVisible = null;
     snapshot.forEach((doc) => {
-      documents.push({ id: doc.id, ...doc.data() });
+      documents.push({ id: doc.id, ...doc.data(), embedding: [] });
       lastVisible = doc;
     });
 
@@ -66,7 +67,7 @@ const getSharedDocuments = async (req, res) => {
     const documents = [];
     let lastVisible = null;
     snapshot.forEach((doc) => {
-      documents.push({ id: doc.id, ...doc.data() });
+      documents.push({ id: doc.id, ...doc.data(), embedding: [] });
       lastVisible = doc;
     });
 
@@ -131,7 +132,7 @@ const addDocument = async (req, res) => {
     });
 
     const db = admin.firestore();
-    const pdfTemplate_id = req.body.template_id || "xsgiPJZWr9iN8BViMQb7";
+    const pdfTemplate_id = req.body.template_id || "PnpQ1GQd7f9IjUmkFLj0";
     const snapshot = await db.collection("templates").doc(pdfTemplate_id).get();
     if (!snapshot.exists) {
       throw new Error("No matching template");
@@ -147,15 +148,21 @@ const addDocument = async (req, res) => {
     const llmResponse = await response.text();
 
     const { title, latexCode } = parseLatexResponse(llmResponse);
+    const updated_title = req.body.title || title;
+
+    const em_model = genAI.getGenerativeModel({ model: "text-embedding-004"});
+    const em_result = await em_model.embedContent([updated_title, latexCode]);
+    const embedding = em_result.embedding.values;
 
     const data = {
-      title: req.body.title || title,
+      title: updated_title,
       latex_code: latexCode,
       template: db.doc("templates/" + pdfTemplate_id),
       user_id: req.uid,
       category: null,
       can_access: [],
       created_at: admin.firestore.FieldValue.serverTimestamp(),
+      embedding : admin.firestore.FieldValue.vector(embedding)
     };
 
     await db.collection("documents").add(data);
@@ -207,12 +214,15 @@ const updateDocument = async (req, res) => {
     const llmResponse = await response.text();
     const parsed_res = parseLatexResponse(llmResponse);
 
+    const em_model = genAI.getGenerativeModel({ model: "text-embedding-004"});
+    const em_result = await em_model.embedContent([parsed_res.title, parsed_res.latexCode]);
+    const embedding = em_result.embedding.values;
+
     await docRef.update({
       title: parsed_res.title,
       latex_code: parsed_res.latexCode,
+      embedding : admin.firestore.FieldValue.vector(embedding)
     });
-
-    console.log(parsed_res);
 
     const { pdfFilePath, cleanupCallback } = await pdf.generate(
       parsed_res.latexCode

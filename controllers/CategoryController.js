@@ -170,10 +170,49 @@ const deleteCategory = async (req, res) => {
   }
 };
 
+const getDocuments = async (req, res) => {
+  try {
+    const uid = req.uid;
+    const { categoryId } = req.params;
+    if (!uid) throw new Error("UID is required");
+    if (!categoryId) throw new Error("Category ID is required");
+
+    const { pageSize = 10, pageToken } = req.query;
+    const db = admin.firestore();
+    const documentsRef = db
+      .collection("documents")
+      .where("user_id", "==", uid)
+      .where("category", "==", db.doc(`categories/${categoryId}`));
+
+    let query = documentsRef.limit(parseInt(pageSize, 10));
+
+    if (pageToken) {
+      const snapshot = await db.collection("documents").doc(pageToken).get();
+      if (!snapshot.exists) throw new Error("Invalid page token");
+
+      query = query.startAfter(snapshot);
+    }
+
+    const snapshot = await query.get();
+    const documents = [];
+    let lastVisible = null;
+    snapshot.forEach((doc) => {
+      documents.push({ id: doc.id, ...doc.data(), embedding: [] });
+      lastVisible = doc;
+    });
+
+    const nextPageToken = lastVisible ? lastVisible.id : null;
+    res.status(StatusCodes.OK).json({ documents, nextPageToken });
+  } catch (error) {
+    res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
+  }
+};
+
 module.exports = {
   createCategory,
   getCategories,
   getCategoryById,
   updateCategory,
   deleteCategory,
+  getDocuments
 };
