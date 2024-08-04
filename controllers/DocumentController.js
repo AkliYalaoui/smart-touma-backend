@@ -151,7 +151,8 @@ const addDocument = async (req, res) => {
     const updated_title = req.body.title || title;
 
     const em_model = genAI.getGenerativeModel({ model: "text-embedding-004"});
-    const em_result = await em_model.embedContent([updated_title, latexCode]);
+    const plain_text = pdf.extractPlainText(latexCode);
+    const em_result = await em_model.embedContent([updated_title, plain_text]);
     const embedding = em_result.embedding.values;
 
     const data = {
@@ -215,7 +216,8 @@ const updateDocument = async (req, res) => {
     const parsed_res = parseLatexResponse(llmResponse);
 
     const em_model = genAI.getGenerativeModel({ model: "text-embedding-004"});
-    const em_result = await em_model.embedContent([parsed_res.title, parsed_res.latexCode]);
+    const plain_text = pdf.extractPlainText(parsed_res.latexCode);
+    const em_result = await em_model.embedContent([parsed_res.title, plain_text]);
     const embedding = em_result.embedding.values;
 
     await docRef.update({

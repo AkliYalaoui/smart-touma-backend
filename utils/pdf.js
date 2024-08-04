@@ -32,4 +32,17 @@ const generate = (latexCode) => {
   });
 };
 
-module.exports = {generate};
+const extractPlainText = (latexCode) => {
+  // Remove LaTeX commands (anything starting with \ and ending with { or })
+  const text = latexCode
+    .replace(/\\[a-zA-Z]+\{[^}]*\}/g, '') // Remove commands with arguments
+    .replace(/\\[a-zA-Z]+/g, '')          // Remove commands without arguments
+    .replace(/\{[^}]*\}/g, '')             // Remove curly braces
+    .replace(/%[^\n]*/g, '')               // Remove comments
+    .replace(/[\s\n]+/g, ' ')              // Normalize whitespace
+    .trim();                              // Trim leading and trailing whitespace
+  return text;
+};
+
+
+module.exports = {generate, extractPlainText};
