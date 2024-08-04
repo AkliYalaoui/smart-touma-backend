@@ -142,8 +142,9 @@ const documentQA = async (req, res) => {
     const answer = await response.text();
 
     // Store the Q&A interaction
-    await db.collection("documents").doc(docId).collection("qa").add({
+    await db.collection("qa").add({
       user_id: uid,
+      doc_id : docId,
       question,
       answer,
       created_at: admin.firestore.FieldValue.serverTimestamp(),
@@ -178,9 +179,8 @@ const getDocumentQAs = async (req, res) => {
     }
 
     const qaSnapshot = await db
-      .collection("documents")
-      .doc(docId)
       .collection("qa")
+      .where("doc_id", "==", docId)
       .orderBy("created_at", "desc")
       .get();
 
