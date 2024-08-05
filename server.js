@@ -15,7 +15,8 @@ config();
 const serviceAccount = require('./serviceAccountKey.json');
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: process.env.DATA_URL
+  databaseURL: process.env.DATA_URL,
+  storageBucket: process.env.BUCKET_URL
 });
 
 

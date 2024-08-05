@@ -1,7 +1,7 @@
 const admin = require("firebase-admin");
 const fs = require("fs");
 const pdf = require("../utils/pdf.js");
-const {convertTimestampToDateString} = require("../utils/dates.js");
+const { convertTimestampToDateString } = require("../utils/dates.js");
 
 const {
   model,
@@ -9,7 +9,7 @@ const {
   pdf_prompt,
   update_pdf_prompt,
   parseLatexResponse,
-  genAI
+  genAI,
 } = require("../gemini.js");
 const { StatusCodes } = require("http-status-codes");
 const { create } = require("domain");
@@ -38,17 +38,21 @@ const getDocuments = async (req, res) => {
     for (const doc of snapshot.docs) {
       const docData = doc.data();
       const templateDoc = await docData.template?.get();
-      const templateName = templateDoc.exists ? templateDoc.data().name : "Unknown Template";
+      const templateName = templateDoc.exists
+        ? templateDoc.data().name
+        : "Unknown Template";
       const categoryDoc = await docData.category?.get();
-      const categoryName = categoryDoc?.exists ? categoryDoc.data().name : "Unknown Category";
+      const categoryName = categoryDoc?.exists
+        ? categoryDoc.data().name
+        : "Unknown Category";
 
       documents.push({
         id: doc.id,
         ...docData,
         template: templateName,
         category: categoryName,
-        created_at : convertTimestampToDateString(docData.created_at),
-        embedding: []
+        created_at: convertTimestampToDateString(docData.created_at),
+        embedding: [],
       });
       lastVisible = doc;
     }
@@ -67,7 +71,9 @@ const getSharedDocuments = async (req, res) => {
 
     const { pageSize = 10, pageToken } = req.query;
     const db = admin.firestore();
-    const documentsRef = db.collection("documents").where("can_access", "array-contains", uid);
+    const documentsRef = db
+      .collection("documents")
+      .where("can_access", "array-contains", uid);
 
     let query = documentsRef.limit(parseInt(pageSize, 10));
 
@@ -84,17 +90,21 @@ const getSharedDocuments = async (req, res) => {
     for (const doc of snapshot.docs) {
       const docData = doc.data();
       const templateDoc = await docData.template?.get();
-      const templateName = templateDoc.exists ? templateDoc.data().name : "Unknown Template";
+      const templateName = templateDoc.exists
+        ? templateDoc.data().name
+        : "Unknown Template";
       const categoryDoc = await docData.category?.get();
-      const categoryName = categoryDoc?.exists ? categoryDoc.data().name : "Unknown Category";
+      const categoryName = categoryDoc?.exists
+        ? categoryDoc.data().name
+        : "Unknown Category";
 
       documents.push({
         id: doc.id,
         ...docData,
         template: templateName,
         category: categoryName,
-        created_at : convertTimestampToDateString(docData.created_at),
-        embedding: []
+        created_at: convertTimestampToDateString(docData.created_at),
+        embedding: [],
       });
       lastVisible = doc;
     }
@@ -105,7 +115,6 @@ const getSharedDocuments = async (req, res) => {
     res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
   }
 };
-
 
 const getDocumentById = async (req, res) => {
   try {
@@ -124,21 +133,28 @@ const getDocumentById = async (req, res) => {
         .json({ error: "Document not found" });
     }
 
-    const { latex_code, user_id, can_access } = docSnapshot.data();
+    const { user_id, can_access } = docSnapshot.data();
     if (user_id !== uid && !can_access.includes(uid)) {
       return res.status(StatusCodes.FORBIDDEN).json({ error: "Access denied" });
     }
 
-    const { pdfFilePath, cleanupCallback } = await pdf.generate(latex_code);
+    const docData = docSnapshot.data();
+    const templateDoc = await docData.template?.get();
+    const templateName = templateDoc.exists
+      ? templateDoc.data().name
+      : "Unknown Template";
+    const categoryDoc = await docData.category?.get();
+    const categoryName = categoryDoc?.exists
+      ? categoryDoc.data().name
+      : "Unknown Category";
 
-    res.status(StatusCodes.OK).sendFile(pdfFilePath, (err) => {
-      if (err) {
-        console.error("Error sending file:", err);
-        res
-          .status(StatusCodes.INTERNAL_SERVER_ERROR)
-          .json({ error: "Error sending file" });
-      }
-      cleanupCallback();
+    res.status(StatusCodes.OK).json({
+      id: docSnapshot.id,
+      ...docData,
+      embedding: [],
+      template: templateName,
+      category: categoryName,
+      created_at: convertTimestampToDateString(docData.created_at),
     });
   } catch (error) {
     res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
@@ -178,7 +194,7 @@ const addDocument = async (req, res) => {
     const { title, latexCode } = parseLatexResponse(llmResponse);
     const updated_title = req.body.title || title;
 
-    const em_model = genAI.getGenerativeModel({ model: "text-embedding-004"});
+    const em_model = genAI.getGenerativeModel({ model: "text-embedding-004" });
     const plain_text = pdf.extractPlainText(latexCode);
     const em_result = await em_model.embedContent([updated_title, plain_text]);
     const embedding = em_result.embedding.values;
@@ -191,22 +207,43 @@ const addDocument = async (req, res) => {
       category: null,
       can_access: [],
       created_at: admin.firestore.FieldValue.serverTimestamp(),
-      embedding : admin.firestore.FieldValue.vector(embedding)
+      embedding: admin.firestore.FieldValue.vector(embedding),
     };
 
-    await db.collection("documents").add(data);
+    const documentRef = await db.collection("documents").add(data);
 
     // Generate PDF from LaTeX code
     const { pdfFilePath, cleanupCallback } = await pdf.generate(latexCode);
+    const bucket = admin.storage().bucket();
+    // Upload PDF to Firebase Storage
+    const destFileName = `pdfs/${documentRef.id}.pdf`;
+    await bucket.upload(pdfFilePath, {
+      destination: destFileName,
+      metadata: {
+        contentType: "application/pdf",
+      },
+    });
 
-    res.status(StatusCodes.CREATED).sendFile(pdfFilePath, (err) => {
-      if (err) {
-        console.error("Error sending file:", err);
-        res
-          .status(StatusCodes.INTERNAL_SERVER_ERROR)
-          .json({ error: "Error sending file" });
-      }
-      cleanupCallback();
+    // Get the URL of the uploaded file
+    const file = bucket.file(destFileName);
+    const [url] = await file.getSignedUrl({
+      action: "read",
+      expires: "03-09-2491", // Set expiration date of URL
+    });
+
+    // Update document with the URL of the PDF
+    await documentRef.update({ url });
+
+    cleanupCallback();
+
+    res.status(StatusCodes.CREATED).json({
+      id: documentRef.id,
+      ...data,
+      url,
+      embedding: [],
+      created_at: new Date().toISOString(),
+      template: template_name,
+      category: "Unknown Category",
     });
   } catch (error) {
     res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
@@ -243,28 +280,53 @@ const updateDocument = async (req, res) => {
     const llmResponse = await response.text();
     const parsed_res = parseLatexResponse(llmResponse);
 
-    const em_model = genAI.getGenerativeModel({ model: "text-embedding-004"});
+    const em_model = genAI.getGenerativeModel({ model: "text-embedding-004" });
     const plain_text = pdf.extractPlainText(parsed_res.latexCode);
-    const em_result = await em_model.embedContent([parsed_res.title, plain_text]);
+    const em_result = await em_model.embedContent([
+      parsed_res.title,
+      plain_text,
+    ]);
     const embedding = em_result.embedding.values;
 
     await docRef.update({
       title: parsed_res.title,
       latex_code: parsed_res.latexCode,
-      embedding : admin.firestore.FieldValue.vector(embedding)
+      embedding: admin.firestore.FieldValue.vector(embedding),
     });
 
     const { pdfFilePath, cleanupCallback } = await pdf.generate(
       parsed_res.latexCode
     );
-    res.status(StatusCodes.OK).sendFile(pdfFilePath, (err) => {
-      if (err) {
-        console.error("Error sending file:", err);
-        res
-          .status(StatusCodes.INTERNAL_SERVER_ERROR)
-          .json({ error: "Error sending file" });
-      }
-      cleanupCallback();
+
+    const bucket = admin.storage().bucket();
+    const destFileName = `pdfs/${docId}.pdf`;
+    await bucket.upload(pdfFilePath, {
+      destination: destFileName,
+      metadata: {
+        contentType: "application/pdf",
+      },
+    });
+
+    // Cleanup the local PDF file
+    cleanupCallback();
+
+    const docData = docSnapshot.data();
+    const templateDoc = await docData.template?.get();
+    const templateName = templateDoc.exists
+      ? templateDoc.data().name
+      : "Unknown Template";
+    const categoryDoc = await docData.category?.get();
+    const categoryName = categoryDoc?.exists
+      ? categoryDoc.data().name
+      : "Unknown Category";
+
+    res.status(StatusCodes.OK).json({
+      id: docId,
+      ...docData,
+      embedding: [],
+      template: templateName,
+      category: categoryName,
+      created_at: convertTimestampToDateString(docData.created_at),
     });
   } catch (error) {
     res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
@@ -288,11 +350,18 @@ const deleteDocument = async (req, res) => {
         .json({ error: "Document not found" });
     }
 
-    const { user_id, can_access } = docSnapshot.data();
+    const { user_id, can_access, url } = docSnapshot.data();
     if (user_id !== uid && !can_access.includes(uid)) {
       return res.status(StatusCodes.FORBIDDEN).json({ error: "Access denied" });
     }
 
+    const bucket = admin.storage().bucket();
+    // Delete the PDF from Firebase Storage
+    if (url) {
+      const pdfPath = new URL(url).pathname.split("/").slice(2).join("/");
+      const pdfFile = bucket.file(pdfPath);
+      await pdfFile.delete();
+    }
     await docRef.delete();
     res
       .status(StatusCodes.OK)
