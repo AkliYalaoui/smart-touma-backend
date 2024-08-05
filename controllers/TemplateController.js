@@ -1,5 +1,6 @@
 const admin = require("firebase-admin");
 const { validateTemplate } = require("../utils/Validator.js");
+const { convertTimestampToDateString } = require("../utils/dates.js");
 const { StatusCodes } = require("http-status-codes");
 const path = require("path");
 
@@ -108,10 +109,27 @@ const getDocuments = async (req, res) => {
     const snapshot = await query.get();
     const documents = [];
     let lastVisible = null;
-    snapshot.forEach((doc) => {
-      documents.push({ id: doc.id, ...doc.data(), embedding: [] });
+    for (const doc of snapshot.docs) {
+      const docData = doc.data();
+      const templateDoc = await docData.template?.get();
+      const templateName = templateDoc.exists
+        ? templateDoc.data().name
+        : "Unknown Template";
+      const categoryDoc = await docData.category?.get();
+      const categoryName = categoryDoc?.exists
+        ? categoryDoc.data().name
+        : "Unknown Category";
+
+      documents.push({
+        id: doc.id,
+        ...docData,
+        template: templateName,
+        category: categoryName,
+        created_at: convertTimestampToDateString(docData.created_at),
+        embedding: [],
+      });
       lastVisible = doc;
-    });
+    }
 
     const nextPageToken = lastVisible ? lastVisible.id : null;
     res.status(StatusCodes.OK).json({ documents, nextPageToken });

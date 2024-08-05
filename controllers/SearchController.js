@@ -1,6 +1,7 @@
 const admin = require("firebase-admin");
 const { StatusCodes } = require("http-status-codes");
 const { genAI } = require("../gemini.js");
+const { convertTimestampToDateString } = require("../utils/dates.js");
 
 const searchDocuments = async (req, res) => {
   try {
@@ -46,11 +47,28 @@ const searchDocuments = async (req, res) => {
       return res.status(StatusCodes.OK).json([]);
     }
 
-    const documents = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-      embedding: []
-    }));
+    const documents = [];
+    for (const doc of snapshot.docs) {
+      const docData = doc.data();
+      const templateDoc = await docData.template?.get();
+      const templateName = templateDoc.exists
+        ? templateDoc.data().name
+        : "Unknown Template";
+      const categoryDoc = await docData.category?.get();
+      const categoryName = categoryDoc?.exists
+        ? categoryDoc.data().name
+        : "Unknown Category";
+
+      documents.push({
+        id: doc.id,
+        ...docData,
+        template: templateName,
+        category: categoryName,
+        created_at: convertTimestampToDateString(docData.created_at),
+        embedding: [],
+      });
+      lastVisible = doc;
+    }
 
     res.status(StatusCodes.OK).json(documents);
   } catch (error) {

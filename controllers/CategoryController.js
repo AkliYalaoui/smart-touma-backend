@@ -1,6 +1,7 @@
 const admin = require("firebase-admin");
 const { StatusCodes } = require("http-status-codes");
-const {validateCategory} = require("../utils/Validator.js");
+const { validateCategory } = require("../utils/Validator.js");
+const { convertTimestampToDateString } = require("../utils/dates.js");
 
 const createCategory = async (req, res) => {
   try {
@@ -52,6 +53,7 @@ const getCategories = async (req, res) => {
     const categories = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
+      created_at: convertTimestampToDateString(doc.data().created_at),
     }));
     res.status(StatusCodes.OK).json(categories);
   } catch (error) {
@@ -83,7 +85,11 @@ const getCategoryById = async (req, res) => {
     }
     res
       .status(StatusCodes.OK)
-      .json({ id: docSnapshot.id, ...docSnapshot.data() });
+      .json({
+        id: docSnapshot.id,
+        ...docSnapshot.data(),
+        created_at: convertTimestampToDateString(docSnapshot.data().created_at),
+      });
   } catch (error) {
     res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
   }
@@ -196,10 +202,27 @@ const getDocuments = async (req, res) => {
     const snapshot = await query.get();
     const documents = [];
     let lastVisible = null;
-    snapshot.forEach((doc) => {
-      documents.push({ id: doc.id, ...doc.data(), embedding: [] });
+    for (const doc of snapshot.docs) {
+      const docData = doc.data();
+      const templateDoc = await docData.template?.get();
+      const templateName = templateDoc.exists
+        ? templateDoc.data().name
+        : "Unknown Template";
+      const categoryDoc = await docData.category?.get();
+      const categoryName = categoryDoc?.exists
+        ? categoryDoc.data().name
+        : "Unknown Category";
+
+      documents.push({
+        id: doc.id,
+        ...docData,
+        template: templateName,
+        category: categoryName,
+        created_at: convertTimestampToDateString(docData.created_at),
+        embedding: [],
+      });
       lastVisible = doc;
-    });
+    }
 
     const nextPageToken = lastVisible ? lastVisible.id : null;
     res.status(StatusCodes.OK).json({ documents, nextPageToken });
@@ -214,5 +237,5 @@ module.exports = {
   getCategoryById,
   updateCategory,
   deleteCategory,
-  getDocuments
+  getDocuments,
 };

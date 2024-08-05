@@ -1,6 +1,7 @@
 const admin = require("firebase-admin");
 const { model, qa_prompt } = require("../gemini.js");
 const { StatusCodes } = require("http-status-codes");
+const { convertTimestampToDateString } = require("../utils/dates.js");
 
 const shareDocument = async (req, res) => {
   try {
@@ -144,7 +145,7 @@ const documentQA = async (req, res) => {
     // Store the Q&A interaction
     await db.collection("qa").add({
       user_id: uid,
-      doc_id : docId,
+      doc_id: docId,
       question,
       answer,
       created_at: admin.firestore.FieldValue.serverTimestamp(),
@@ -184,11 +185,16 @@ const getDocumentQAs = async (req, res) => {
       .orderBy("created_at", "desc")
       .get();
 
+    console.log(qaSnapshot.empty);
+
     if (qaSnapshot.empty) {
       return res.status(StatusCodes.OK).json([]);
     }
 
-    const qas = qaSnapshot.docs.map((doc) => doc.data());
+    const qas = qaSnapshot.docs.map((doc) => ({
+      ...doc.data(),
+      created_at: convertTimestampToDateString(doc.data().created_at),
+    }));
     res.status(StatusCodes.OK).json(qas);
   } catch (error) {
     res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
