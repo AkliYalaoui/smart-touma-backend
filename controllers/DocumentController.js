@@ -12,7 +12,6 @@ const {
   genAI,
 } = require("../gemini.js");
 const { StatusCodes } = require("http-status-codes");
-const { create } = require("domain");
 
 const getDocuments = async (req, res) => {
   try {
@@ -353,6 +352,11 @@ const deleteDocument = async (req, res) => {
     const { user_id, can_access, url } = docSnapshot.data();
     if (user_id !== uid && !can_access.includes(uid)) {
       return res.status(StatusCodes.FORBIDDEN).json({ error: "Access denied" });
+    }
+    const qaRef = db.collection("qa").where("doc_id", "==", docId);
+    const qa_snapshot = await qaRef.get();
+    for (const doc of qa_snapshot.docs) {
+      await doc.ref.delete();
     }
 
     const bucket = admin.storage().bucket();
