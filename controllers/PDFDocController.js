@@ -6,10 +6,10 @@ const { convertTimestampToDateString } = require("../utils/dates.js");
 const shareDocument = async (req, res) => {
   try {
     const { docId } = req.params;
-    const { userIds } = req.body; // Array of user IDs to share the document with
+    const userEmails = req.body.userEmails?.split(",").map((e) => e.trim());
 
-    if (!docId || !Array.isArray(userIds) || userIds.length === 0) {
-      throw new Error("Document ID and list of user IDs are required");
+    if (!docId || !Array.isArray(userEmails) || userEmails.length === 0) {
+      throw new Error("Document ID and list of user Emails are required");
     }
 
     const uid = req.uid;
@@ -28,6 +28,12 @@ const shareDocument = async (req, res) => {
       return res.status(StatusCodes.FORBIDDEN).json({ error: "Access denied" });
     }
 
+    const userIds = [];
+
+    for (let email of userEmails) {
+      const userId = (await admin.auth().getUserByEmail(email)).uid;
+      userIds.push(userId);
+    }
     const updatedCanAccess = Array.from(
       new Set([...docData.can_access, ...userIds])
     ); // Merge and remove duplicates
@@ -182,10 +188,8 @@ const getDocumentQAs = async (req, res) => {
     const qaSnapshot = await db
       .collection("qa")
       .where("doc_id", "==", docId)
-      .orderBy("created_at", "desc")
+      .orderBy("created_at", "asc")
       .get();
-
-    console.log(qaSnapshot.empty);
 
     if (qaSnapshot.empty) {
       return res.status(StatusCodes.OK).json([]);
