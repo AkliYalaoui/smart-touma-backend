@@ -31,9 +31,12 @@ Key Requirements:
 Please use the ${template} template and respond in the following format:
 Title: Your Document Title
 
+Summary: Provide a brief summary of the content of the document.
+
 \\documentclass{${template}}
 ...
 `;
+
 
 const update_pdf_prompt = (template_name, user_prompt, title, latex_code) => `
 You are a LaTeX expert. Your task is to update the provided LaTeX document according to the given user instructions. Your updated LaTeX code must be valid and compile without errors. Please ensure the following:
@@ -71,11 +74,17 @@ const parseLatexResponse = (response) => {
   const titleMatch = response.match(/Title: (.+)\n/);
   const title = titleMatch ? titleMatch[1] : "Untitled";
 
-  // Extract LaTeX code (everything after the first blank line)
-  const latexCode = response.split("\n\n").slice(1).join("\n\n");
+  // Extract summary
+  const summaryMatch = response.match(/Summary: (.+)\n/);
+  const summary = summaryMatch ? summaryMatch[1] : "No summary available";
 
-  return { title, latexCode };
+  // Extract LaTeX code (everything after the summary)
+  const latexCodeStartIndex = response.indexOf("\n\n", response.indexOf("Summary:"));
+  const latexCode = response.slice(latexCodeStartIndex + 2).trim();
+
+  return { title, summary, latexCode };
 };
+
 
 const qa_prompt = (latex_code, question) => {
   const prompt = `

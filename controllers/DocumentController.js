@@ -97,7 +97,16 @@ const getSharedDocuments = async (req, res) => {
     const uid = req.uid;
     if (!uid) throw new Error("UID is required");
 
-    const { pageSize = 10, pageToken } = req.query;
+    let { pageSize, pageToken, userEmails } = req.query;
+    if (!pageSize) pageSize = 10;
+    userEmails = userEmails?.split(",")?.map((e) => e.trim()) || [];
+    console.log(userEmails);
+
+    const sharedBy = [];
+    for (let email of userEmails) {
+      const userId = (await admin.auth().getUserByEmail(email)).uid;
+      sharedBy.push(userId);
+    }
     const db = admin.firestore();
     const documentsRef = db
       .collection("documents")
@@ -219,16 +228,18 @@ const addDocument = async (req, res) => {
     const response = await result.response;
     const llmResponse = await response.text();
 
-    const { title, latexCode } = parseLatexResponse(llmResponse);
+    const { title, summary, latexCode } = parseLatexResponse(llmResponse);
     const updated_title = req.body.title || title;
 
     const em_model = genAI.getGenerativeModel({ model: "text-embedding-004" });
     const plain_text = pdf.extractPlainText(latexCode);
+
     const em_result = await em_model.embedContent([updated_title, plain_text]);
     const embedding = em_result.embedding.values;
 
     const data = {
       title: updated_title,
+      summary,
       latex_code: latexCode,
       template: db.doc("templates/" + pdfTemplate_id),
       user_id: req.uid,

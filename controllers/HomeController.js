@@ -51,7 +51,7 @@ const getScreenPageData = async (req, res) => {
       const categoryDoc = await docData.category?.get();
       const categoryName = categoryDoc?.exists ? categoryDoc.data().name : "Unknown Category";
 
-      recentDocuments.push({
+      sharedDocuments.push({
         id: doc.id,
         ...docData,
         template: templateName,

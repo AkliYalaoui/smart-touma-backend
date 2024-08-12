@@ -6,7 +6,7 @@ const { convertTimestampToDateString } = require("../utils/dates.js");
 const shareDocument = async (req, res) => {
   try {
     const { docId } = req.params;
-    const userEmails = req.body.userEmails?.split(",").map((e) => e.trim());
+    const userEmails = req.body.userEmails?.split(",")?.map((e) => e.trim());
 
     if (!docId || !Array.isArray(userEmails) || userEmails.length === 0) {
       throw new Error("Document ID and list of user Emails are required");

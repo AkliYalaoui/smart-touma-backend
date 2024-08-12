@@ -5,20 +5,12 @@ const { convertTimestampToDateString } = require("../utils/dates.js");
 
 const searchDocuments = async (req, res) => {
   try {
-    const { categoryId, templateId, search } = req.query;
+    const { search } = req.query;
     const { uid } = req;
     const db = admin.firestore();
 
     // Base query
     let query = db.collection("documents").where("user_id", "==", uid);
-
-    // Apply filters
-    if (categoryId) {
-      query = query.where("category", "==", db.doc(`categories/${categoryId}`));
-    }
-    if (templateId) {
-      query = query.where("template", "==", db.doc(`templates/${templateId}`));
-    }
 
     // Perform search in title and LaTeX code
     if (search) {
