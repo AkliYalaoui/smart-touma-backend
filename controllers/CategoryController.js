@@ -83,13 +83,11 @@ const getCategoryById = async (req, res) => {
     if (docSnapshot.data().user_id != uid) {
       return res.status(StatusCodes.FORBIDDEN).json({ error: "Access denied" });
     }
-    res
-      .status(StatusCodes.OK)
-      .json({
-        id: docSnapshot.id,
-        ...docSnapshot.data(),
-        created_at: convertTimestampToDateString(docSnapshot.data().created_at),
-      });
+    res.status(StatusCodes.OK).json({
+      id: docSnapshot.id,
+      ...docSnapshot.data(),
+      created_at: convertTimestampToDateString(docSnapshot.data().created_at),
+    });
   } catch (error) {
     res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
   }
@@ -185,6 +183,17 @@ const getDocuments = async (req, res) => {
 
     const { pageSize = 10, pageToken } = req.query;
     const db = admin.firestore();
+
+    const category_snapshot = await db
+      .collection("categories")
+      .doc(categoryId)
+      .get();
+    if (!category_snapshot.exists) {
+      return res
+        .status(StatusCodes.NOT_FOUND)
+        .json({ error: "Template not found" });
+    }
+
     const documentsRef = db
       .collection("documents")
       .where("user_id", "==", uid)
@@ -225,7 +234,13 @@ const getDocuments = async (req, res) => {
     }
 
     const nextPageToken = lastVisible ? lastVisible.id : null;
-    res.status(StatusCodes.OK).json({ documents, nextPageToken });
+    res
+      .status(StatusCodes.OK)
+      .json({
+        documents,
+        nextPageToken,
+        category: category_snapshot.data().name,
+      });
   } catch (error) {
     res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
   }

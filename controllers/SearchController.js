@@ -5,7 +5,7 @@ const { convertTimestampToDateString } = require("../utils/dates.js");
 
 const searchDocuments = async (req, res) => {
   try {
-    const { categoryId, templateId, sharedBy, search = "" } = req.query;
+    const { categoryId, templateId, search } = req.query;
     const { uid } = req;
     const db = admin.firestore();
 
@@ -18,9 +18,6 @@ const searchDocuments = async (req, res) => {
     }
     if (templateId) {
       query = query.where("template", "==", db.doc(`templates/${templateId}`));
-    }
-    if (sharedBy) {
-      query = query.where("can_access", "array-contains", sharedBy);
     }
 
     // Perform search in title and LaTeX code
@@ -35,7 +32,7 @@ const searchDocuments = async (req, res) => {
         "embedding",
         admin.firestore.FieldValue.vector(embedding),
         {
-          limit: 2,
+          limit: 6,
           distanceMeasure: "COSINE",
         }
       );

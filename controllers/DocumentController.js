@@ -18,10 +18,36 @@ const getDocuments = async (req, res) => {
     const uid = req.uid;
     if (!uid) throw new Error("UID is required");
 
-    const { pageSize = 10, pageToken } = req.query;
+    const {
+      pageSize = 10,
+      pageToken,
+      sortBy,
+      filterByCategory,
+      filterByTemplate,
+    } = req.query;
     const db = admin.firestore();
-    const documentsRef = db.collection("documents").where("user_id", "==", uid);
+    let documentsRef = db.collection("documents").where("user_id", "==", uid);
 
+    // Apply category filter
+    if (filterByCategory) {
+      const categoryRef = db.collection("categories").doc(filterByCategory);
+      documentsRef = documentsRef.where("category", "==", categoryRef);
+    }
+
+    // Apply template filter
+    if (filterByTemplate) {
+      const templateRef = db.collection("templates").doc(filterByTemplate);
+      documentsRef = documentsRef.where("template", "==", templateRef);
+    }
+
+    // Apply sorting
+    if (sortBy) {
+      documentsRef = documentsRef.orderBy(sortBy, "desc"); // Assuming descending order
+    } else {
+      documentsRef = documentsRef.orderBy("created_at", "desc"); // Default sorting
+    }
+
+    // Handle pagination
     let query = documentsRef.limit(parseInt(pageSize, 10));
 
     if (pageToken) {
@@ -34,6 +60,7 @@ const getDocuments = async (req, res) => {
     const snapshot = await query.get();
     const documents = [];
     let lastVisible = null;
+
     for (const doc of snapshot.docs) {
       const docData = doc.data();
       const templateDoc = await docData.template?.get();
@@ -51,12 +78,14 @@ const getDocuments = async (req, res) => {
         template: templateName,
         category: categoryName,
         created_at: convertTimestampToDateString(docData.created_at),
-        embedding: [],
+        embedding: [], // Assuming embedding is handled elsewhere
       });
+
       lastVisible = doc;
     }
 
     const nextPageToken = lastVisible ? lastVisible.id : null;
+
     res.status(StatusCodes.OK).json({ documents, nextPageToken });
   } catch (error) {
     res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });

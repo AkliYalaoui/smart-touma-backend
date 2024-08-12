@@ -92,6 +92,17 @@ const getDocuments = async (req, res) => {
 
     const { pageSize = 10, pageToken } = req.query;
     const db = admin.firestore();
+
+    const template_snapshot = await db
+      .collection("templates")
+      .doc(templateId)
+      .get();
+    if (!template_snapshot.exists) {
+      return res
+        .status(StatusCodes.NOT_FOUND)
+        .json({ error: "Template not found" });
+    }
+
     const documentsRef = db
       .collection("documents")
       .where("user_id", "==", uid)
@@ -132,7 +143,13 @@ const getDocuments = async (req, res) => {
     }
 
     const nextPageToken = lastVisible ? lastVisible.id : null;
-    res.status(StatusCodes.OK).json({ documents, nextPageToken });
+    res
+      .status(StatusCodes.OK)
+      .json({
+        documents,
+        nextPageToken,
+        template: template_snapshot.data().name,
+      });
   } catch (error) {
     res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
   }
