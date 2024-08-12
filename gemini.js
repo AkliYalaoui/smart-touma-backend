@@ -37,37 +37,41 @@ Summary: Provide a brief summary of the content of the document.
 ...
 `;
 
-
 const update_pdf_prompt = (template_name, user_prompt, title, latex_code) => `
-You are a LaTeX expert. Your task is to update the provided LaTeX document according to the given user instructions. Your updated LaTeX code must be valid and compile without errors. Please ensure the following:
+You are an expert in LaTeX. Your task is to update the provided LaTeX code according to the user's instructions. Your updated LaTeX code must be fully functional, compile without errors, and generate a correct PDF. 
 
-1. Include any necessary LaTeX packages required for the document, especially those used in the existing LaTeX code (e.g., \`amsmath\` if you're using mathematical environments).
-2. The updated LaTeX code should be free of syntax errors and compatible with PDF generation.
-3. Verify that the document structure is correct and follows LaTeX conventions.
+Please ensure the following:
 
-Template Name: ${template_name}
-Title of the document: ${title}
+1. **Include Necessary Packages**: Add any required LaTeX packages for the document, especially those used in the existing code (e.g., \`amsmath\` for math environments).
+2. **Error-Free Code**: The updated LaTeX code must be free of syntax errors, including unmatched braces or unclosed environments.
+3. **Document Structure**: Ensure the structure adheres to LaTeX conventions and is suitable for PDF generation.
 
-Existing LaTeX Code:
+**Template Name**: ${template_name}
+**Document Title**: ${title}
+
+**Existing LaTeX Code**:
+\`\`\`
 ${latex_code}
+\`\`\`
 
-User Instructions:
+**User Instructions**:
 ${user_prompt}
 
-Please provide the updated LaTeX code, ensuring:
-1. The LaTeX code is valid and does not contain syntax errors.
-2. The document includes all necessary packages and settings for proper compilation.
-3. The LaTeX document adheres to LaTeX conventions and is suitable for PDF generation without errors.
+Please provide the updated LaTeX code. Make sure to:
 
-Response format:
-Title: [Updated Document Title]
+1. Verify the LaTeX code is valid and compiles without errors.
+2. Include all necessary packages and configurations.
+3. Confirm the document follows proper LaTeX conventions.
 
+**Response Format**:
+\`\`\`latex
+% Updated Document Title: [Title]
 \\documentclass{${template_name}}
- % Include necessary packages
+% Include necessary packages
 [Updated LaTeX Code]...
 \\end{document}
+\`\`\`
 `;
-
 
 const parseLatexResponse = (response) => {
   // Extract title
@@ -78,13 +82,15 @@ const parseLatexResponse = (response) => {
   const summaryMatch = response.match(/Summary: (.+)\n/);
   const summary = summaryMatch ? summaryMatch[1] : "No summary available";
 
-  // Extract LaTeX code (everything after the summary)
-  const latexCodeStartIndex = response.indexOf("\n\n", response.indexOf("Summary:"));
-  const latexCode = response.slice(latexCodeStartIndex + 2).trim();
+  // Extract LaTeX code block (everything within the `latex` code block)
+  const latexCodeStartIndex = response.indexOf('\\documentclass');
+  const latexCodeEndIndex = response.indexOf('\\end{document}');
+  const latexCode = latexCodeStartIndex !== -1 && latexCodeEndIndex !== -1 
+    ? response.slice(latexCodeStartIndex, latexCodeEndIndex + '\\end{document}'.length).trim()
+    : "No LaTeX code found";
 
   return { title, summary, latexCode };
 };
-
 
 const qa_prompt = (latex_code, question) => {
   const prompt = `
@@ -115,5 +121,5 @@ module.exports = {
   parseLatexResponse,
   update_pdf_prompt,
   qa_prompt,
-  genAI
+  genAI,
 };

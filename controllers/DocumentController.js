@@ -318,7 +318,8 @@ const updateDocument = async (req, res) => {
     const response = await result.response;
     const llmResponse = await response.text();
     const parsed_res = parseLatexResponse(llmResponse);
-
+    console.log(parsed_res.latexCode);
+    
     const em_model = genAI.getGenerativeModel({ model: "text-embedding-004" });
     const plain_text = pdf.extractPlainText(parsed_res.latexCode);
     const em_result = await em_model.embedContent([
